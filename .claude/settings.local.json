@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/phanarabbit/ -maxdepth 6 \\\\\\( -name \"*.jpg\" -o -name \"*.jpeg\" -o -name \"*.png\" -o -name \"*.heic\" -o -name \"*.HEIC\" \\\\\\) -newer \"/Users/phanarabbit/kidlek-app/kidlek-app/CLAUDE.md\" 2>/dev/null | grep -v \"Library\\\\|Cache\\\\|Trash\\\\|Screenshot\")",
+      "Read(//Users/phanarabbit/**)",
+      "Bash(base64 -i /Users/phanarabbit/kidlek-app/kidlek-app/avatar.jpeg)",
+      "Read(//tmp/**)",
+      "Bash(base64 -i /Users/phanarabbit/kidlek-app/kidlek-app/QR.jpeg > /tmp/qr_b64.txt && wc -c /tmp/qr_b64.txt)",
+      "Bash(python3)",
+      "Bash(awk 'NR==941, NR==960' /Users/phanarabbit/kidlek-app/kidlek-app/คิดเลขเร็ว.html)",
+      "Bash(rm -rf .git)",
+      "Bash(git init *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}
