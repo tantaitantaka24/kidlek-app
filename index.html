@@ -882,6 +882,24 @@
   .bracket-d1 { color: #1f2937; font-weight: 700; } /* ดำ */
   .bracket-d2 { color: #dc2626; font-weight: 700; } /* แดง */
   .bracket-d3 { color: #16a34a; font-weight: 700; } /* เขียว */
+
+  /* Custom Solver Screen */
+  .custom-digit-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .custom-digit-input {
+    width: 64px; height: 80px; border: 2px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
+    font-family: 'Bai Jamjuree', sans-serif; font-size: 40px; font-weight: 700;
+    text-align: center; background: var(--bg); outline: none;
+  }
+  .custom-digit-input:focus { border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent); }
+  .custom-target-input {
+    width: 140px; height: 56px; margin-top: 8px;
+    border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+    font-family: 'Bai Jamjuree', sans-serif; font-size: 28px; font-weight: 700;
+    text-align: center; background: var(--bg); outline: none; padding: 0 12px;
+  }
+  .custom-target-input:focus { border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent); }
+  .custom-error { color: var(--red); font-size: 13px; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -948,6 +966,7 @@
 
     <div class="home-actions">
       <button class="btn btn-secondary" id="btn-print-mode">โหมดพิมพ์โจทย์ 20 ข้อ</button>
+      <button class="btn btn-ghost" id="btn-custom-mode">🔍 เฉลยโจทย์เอง</button>
       <button class="btn btn-ghost" id="btn-stats">ดูสถิติ</button>
       <button class="btn btn-ghost" id="btn-clear-stats">ล้างสถิติ</button>
     </div>
@@ -1086,6 +1105,47 @@
     </div>
 
     <div id="print-output"></div>
+  </div>
+
+  <div class="screen" id="screen-custom">
+    <div class="container">
+      <h1><span class="stroke">เฉลยโจทย์เอง</span></h1>
+
+      <div class="setting-block">
+        <span class="setting-label">ระดับชั้น</span>
+        <div class="option-row" id="custom-opt-level">
+          <button class="option-btn active" data-level="primary-low">ป.1–3</button>
+          <button class="option-btn" data-level="primary-high">ป.4–6</button>
+        </div>
+      </div>
+
+      <div class="setting-block">
+        <span class="setting-label">จำนวนตัวเลข</span>
+        <div class="option-row" id="custom-opt-count">
+          <button class="option-btn active" data-count="4">4 ตัวเลข → 2 หลัก</button>
+          <button class="option-btn" data-count="5">5 ตัวเลข → 3 หลัก</button>
+        </div>
+      </div>
+
+      <div class="setting-block">
+        <span class="setting-label">ตัวเลขโจทย์</span>
+        <div id="custom-digit-inputs" class="custom-digit-row"></div>
+        <p id="custom-digit-error" class="custom-error" style="display:none"></p>
+      </div>
+
+      <div class="setting-block">
+        <span class="setting-label">คำตอบที่ต้องการ</span>
+        <input type="number" id="custom-target" class="custom-target-input" placeholder="เช่น 28" min="10" max="999">
+        <p id="custom-target-error" class="custom-error" style="display:none"></p>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btn-custom-solve">เฉลย →</button>
+        <button class="btn btn-outline" id="btn-custom-back">← กลับ</button>
+      </div>
+
+      <div id="custom-result"></div>
+    </div>
   </div>
 
   <a class="credit-footer" href="https://web.facebook.com/ape.czar" target="_blank" rel="noopener noreferrer">
@@ -2556,6 +2616,125 @@ function renderPrintOutput(items) {
 
 // ---- INIT ----
 updateHeaderStats();
+
+// ---- CUSTOM SOLVER SCREEN ----
+const customState = { level: 'primary-low', count: 4 };
+
+function renderCustomDigitInputs() {
+  const row = document.getElementById('custom-digit-inputs');
+  row.innerHTML = '';
+  for (let i = 0; i < customState.count; i++) {
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.min = 0; inp.max = 9;
+    inp.className = 'custom-digit-input';
+    inp.maxLength = 1;
+    inp.addEventListener('input', () => {
+      if (inp.value.length > 1) inp.value = inp.value.slice(-1);
+      validateCustomDigits();
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        const inputs = [...row.querySelectorAll('.custom-digit-input')];
+        const idx = inputs.indexOf(inp);
+        if (idx < inputs.length - 1) { e.preventDefault(); inputs[idx+1].focus(); }
+      }
+    });
+    row.appendChild(inp);
+  }
+}
+
+function validateCustomDigits() {
+  const inputs = [...document.querySelectorAll('.custom-digit-input')];
+  const vals = inputs.map(i => i.value.trim()).filter(v => v !== '');
+  if (vals.length < customState.count) { hideError('custom-digit-error'); return false; }
+  const nums = vals.map(Number);
+  const zeros = nums.filter(n => n === 0).length;
+  if (zeros > 1) { showError('custom-digit-error', '0 มีได้ไม่เกิน 1 ตัว'); return false; }
+  const freq = {};
+  for (const n of nums) freq[n] = (freq[n] || 0) + 1;
+  if (Object.values(freq).some(f => f > 2)) { showError('custom-digit-error', 'ตัวเลขซ้ำได้ไม่เกิน 2 ตัว'); return false; }
+  hideError('custom-digit-error'); return true;
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideError(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+document.getElementById('btn-custom-mode').addEventListener('click', () => {
+  renderCustomDigitInputs();
+  document.getElementById('custom-result').innerHTML = '';
+  showScreen('screen-custom');
+});
+document.getElementById('btn-custom-back').addEventListener('click', () => showScreen('screen-home'));
+
+document.getElementById('custom-opt-level').addEventListener('click', e => {
+  if (!e.target.matches('.option-btn')) return;
+  document.querySelectorAll('#custom-opt-level .option-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  customState.level = e.target.dataset.level;
+});
+
+document.getElementById('custom-opt-count').addEventListener('click', e => {
+  if (!e.target.matches('.option-btn')) return;
+  document.querySelectorAll('#custom-opt-count .option-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  customState.count = parseInt(e.target.dataset.count);
+  renderCustomDigitInputs();
+});
+
+document.getElementById('btn-custom-solve').addEventListener('click', async () => {
+  if (!validateCustomDigits()) return;
+  const inputs = [...document.querySelectorAll('.custom-digit-input')];
+  const digits = inputs.map(i => parseInt(i.value));
+  const target = parseInt(document.getElementById('custom-target').value);
+  const minT = customState.count === 4 ? 10 : 100;
+  const maxT = customState.count === 4 ? 99 : 999;
+  if (isNaN(target) || target < minT || target > maxT) {
+    showError('custom-target-error', `คำตอบต้องเป็น ${minT}–${maxT}`);
+    return;
+  }
+  hideError('custom-target-error');
+
+  const btn = document.getElementById('btn-custom-solve');
+  btn.disabled = true; btn.textContent = 'กำลังคิด...';
+  document.getElementById('custom-result').innerHTML = '';
+
+  try {
+    const data = await solveAsync(digits, target, customState.level);
+    renderCustomResult(digits, target, data);
+  } catch (e) {
+    document.getElementById('custom-result').innerHTML = '<p style="color:var(--red)">หมดเวลา — ลองใหม่</p>';
+  } finally {
+    btn.disabled = false; btn.textContent = 'เฉลย →';
+  }
+});
+
+function renderCustomResult(digits, target, data) {
+  const area = document.getElementById('custom-result');
+  if (!data.solutions || data.solutions.length === 0) {
+    area.innerHTML = `<p>ไม่พบวิธีคิดสำหรับโจทย์นี้</p>`; return;
+  }
+  const badgeClass = data.isExact ? 'exact' : 'approx';
+  const badgeText  = data.isExact ? 'ตรงผลลัพธ์' : 'ใกล้เคียงที่สุด';
+  let html = `<div class="reveal-section"><h3>เฉลย <span class="badge ${badgeClass}">${badgeText}</span></h3>`;
+  data.solutions.forEach((sol, idx) => {
+    html += `<div class="solution">
+      <div class="solution-title">
+        <span>วิธีที่ ${idx + 1}</span>
+        <span class="solution-problem">${digits.join(' ')} = ${target}</span>
+      </div>
+      <div class="solution-steps">`;
+    for (const step of sol.steps) html += `<div class="step">${fmtMath(step)}</div>`;
+    html += `<div class="final-line">→ ${fmtMath(sol.expr)} = <strong>${sol.finalStr}</strong></div>`;
+    html += `</div></div>`;
+  });
+  html += `</div>`;
+  area.innerHTML = html;
+}
 </script>
 
 </body>
