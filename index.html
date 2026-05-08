@@ -877,6 +877,11 @@
   .credit-footer .credit-text strong {
     font-size: 16px;
   }
+
+  /* วงเล็บสีต่างชั้น */
+  .bracket-d1 { color: #ef4444; font-weight: 700; }
+  .bracket-d2 { color: #f97316; font-weight: 700; }
+  .bracket-d3 { color: #eab308; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -2327,7 +2332,7 @@ function escapeHtml(s) {
 }
 
 function fmtMath(s) {
-  function walk(str) {
+  function walk(str, depth = 0) {
     let i = 0;
     let result = '';
 
@@ -2354,9 +2359,11 @@ function fmtMath(s) {
       return null;
     }
 
-    function renderAtom(atom) {
+    function renderAtom(atom, depth) {
       if (atom.startsWith('(')) {
-        return '(' + walk(atom.slice(1, -1)) + ')';
+        const d = (depth % 3) + 1;
+        const cls = `bracket-d${d}`;
+        return `<span class="${cls}">(</span>` + walk(atom.slice(1, -1), depth + 1) + `<span class="${cls}">)</span>`;
       }
       return atom;
     }
@@ -2368,7 +2375,7 @@ function fmtMath(s) {
         i++;
         const rad = readAtom();
         if (rad !== null) {
-          result += `√<span class="rad">${renderAtom(rad)}</span>`;
+          result += `√<span class="rad">${renderAtom(rad, depth)}</span>`;
         } else {
           result += '√';
         }
@@ -2377,13 +2384,13 @@ function fmtMath(s) {
 
       if (/\d/.test(ch) || ch === '(') {
         const atom = readAtom();
-        const rendered = renderAtom(atom);
+        const rendered = renderAtom(atom, depth);
 
         if (i < str.length && str[i] === '^') {
           i++;
           const exp = readAtom();
           if (exp !== null) {
-            result += `${rendered}<sup>${renderAtom(exp)}</sup>`;
+            result += `${rendered}<sup>${renderAtom(exp, depth + 1)}</sup>`;
           } else {
             result += rendered + '^';
           }
@@ -2391,7 +2398,7 @@ function fmtMath(s) {
           i++;
           const rad = readAtom();
           if (rad !== null) {
-            result += `<sup>${rendered}</sup>√<span class="rad">${renderAtom(rad)}</span>`;
+            result += `<sup>${rendered}</sup>√<span class="rad">${renderAtom(rad, depth + 1)}</span>`;
           } else {
             result += rendered + '√';
           }
