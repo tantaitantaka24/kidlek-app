@@ -103,6 +103,12 @@
   .screen { display: none; animation: fadeIn 0.4s ease; }
   .screen.active { display: block; }
 
+  /* Apple Pencil ink over the play screen */
+  #screen-play { position: relative; }
+  #ink { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5; }
+  #btn-ink-clear { position: fixed; right: 16px; bottom: 16px; z-index: 6; display: none; }
+  #btn-ink-clear.show { display: block; }
+
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1051,6 +1057,8 @@
 
     <div id="hint-area"></div>
     <div id="reveal-area"></div>
+    <canvas id="ink"></canvas>
+    <button class="btn" id="btn-ink-clear">🧽 ลบลายมือ</button>
   </div>
 
   <!-- STATS SCREEN -->
@@ -2222,6 +2230,7 @@ function startNewProblem() {
   document.getElementById('target-result').textContent = state.current.target;
   document.getElementById('hint-area').innerHTML = '';
   document.getElementById('reveal-area').innerHTML = '';
+  clearInk();
 
   // start timer
   stopTimer();
@@ -2741,6 +2750,67 @@ function renderCustomResult(digits, target, data) {
   html += `</div>`;
   area.innerHTML = html;
 }
+
+// ---- Apple Pencil ink: the Pencil writes on the play screen, fingers still tap and scroll ----
+const screenPlay = document.getElementById('screen-play');
+const ink = document.getElementById('ink');
+const inkCtx = ink.getContext('2d');
+const inkClearBtn = document.getElementById('btn-ink-clear');
+let inkLast = null;
+
+function sizeInk() {
+  const w = screenPlay.offsetWidth, h = screenPlay.offsetHeight;
+  if (!w || !h) return; // screen hidden
+  const dpr = window.devicePixelRatio || 1;
+  const old = document.createElement('canvas');
+  old.width = ink.width; old.height = ink.height;
+  old.getContext('2d').drawImage(ink, 0, 0);
+  ink.width = w * dpr; ink.height = h * dpr;
+  ink.style.width = w + 'px'; ink.style.height = h + 'px';
+  inkCtx.drawImage(old, 0, 0); // keep what was written
+  inkCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+new ResizeObserver(sizeInk).observe(screenPlay);
+
+function clearInk() {
+  inkCtx.save();
+  inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+  inkCtx.clearRect(0, 0, ink.width, ink.height);
+  inkCtx.restore();
+  inkClearBtn.classList.remove('show');
+}
+inkClearBtn.addEventListener('click', clearInk);
+
+function inkPoint(e) {
+  const r = ink.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+screenPlay.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'pen') return;
+  inkLast = inkPoint(e);
+  screenPlay.setPointerCapture(e.pointerId);
+});
+screenPlay.addEventListener('pointermove', e => {
+  if (!inkLast || e.pointerType !== 'pen') return;
+  inkCtx.strokeStyle = '#c1121f';
+  inkCtx.lineCap = inkCtx.lineJoin = 'round';
+  const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+  for (const ev of (coalesced.length ? coalesced : [e])) {
+    const p = inkPoint(ev);
+    inkCtx.lineWidth = 2 + (ev.pressure || 0.5) * 4;
+    inkCtx.beginPath();
+    inkCtx.moveTo(inkLast.x, inkLast.y);
+    inkCtx.lineTo(p.x, p.y);
+    inkCtx.stroke();
+    inkLast = p;
+  }
+  inkClearBtn.classList.add('show');
+});
+['pointerup', 'pointercancel'].forEach(t => screenPlay.addEventListener(t, () => { inkLast = null; }));
+// stop the Pencil from scrolling the page on iPad (fingers still scroll)
+['touchstart', 'touchmove'].forEach(t => screenPlay.addEventListener(t, e => {
+  if ([...e.touches].some(touch => touch.touchType === 'stylus')) e.preventDefault();
+}, { passive: false }));
 </script>
 
 </body>
